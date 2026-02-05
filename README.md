@@ -1,6 +1,6 @@
 # Vigil Eye NestJS SDK
 
-A NestJS SDK for [Vigil Eye](https://github.com/vigileye/vigileye) - the self-hosted error tracking system.
+A NestJS SDK for [Vigil Eye](https://github.com/prabalesh/vigileye) - the self-hosted error tracking system.
 
 ## Installation
 
