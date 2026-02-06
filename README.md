@@ -5,14 +5,12 @@ A NestJS SDK for [Vigil Eye](https://github.com/prabalesh/vigileye) - the self-h
 ## Installation
 
 ```bash
-npm install @vigileye/nestjs axios
+npm install git+https://github.com/prabalesh/vigileye-nestjs.git
 ```
 
-## Basic Usage
+## Basic Setup
 
-### 1. Register the Module
-
-Import `VigileEyeModule` into your root `AppModule`:
+Initialize the `VigileEyeModule` in your `app.module.ts`:
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -21,51 +19,81 @@ import { VigileEyeModule } from '@vigileye/nestjs';
 @Module({
   imports: [
     VigileEyeModule.forRoot({
-      apiKey: process.env.VIGILEYE_API_KEY!,
-      serverUrl: process.env.VIGILEYE_URL || 'https://vigileye.yourdomain.com',
+      apiKey: 'your-environment-api-key',
+      serverUrl: 'http://your-vigileye-server.com',
       enabled: process.env.NODE_ENV === 'production',
+      ignoreStatusCodes: [404, 401], // Optional: ignore specific errors
     }),
   ],
 })
 export class AppModule {}
 ```
 
-Registering `VigileEyeModule` automatically attaches a global exception filter that logs all unhandled exceptions to your Vigil Eye server.
+## Multi-Environment Support
 
-### 2. Manual Logging
+Vigil Eye supports multiple environments per project (e.g., Production, Staging, Development). Each environment has its own unique API key. Use environment variables to configure the SDK correctly:
 
-You can inject `VigileEyeService` into any of your services to log errors, warnings, or info messages manually.
+```typescript
+VigileEyeModule.forRoot({
+  apiKey: process.env.VIGILEYE_API_KEY,
+  serverUrl: process.env.VIGILEYE_URL,
+  enabled: process.env.NODE_ENV !== 'test',
+})
+```
+
+## Manual Logging
+
+Inject the `VigileEyeService` to log custom events or handle errors manually:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { VigileEyeService } from '@vigileye/nestjs';
 
 @Injectable()
-export class UserService {
+export class MyService {
   constructor(private readonly vigileye: VigileEyeService) {}
 
-  async createUser(data: any) {
+  someMethod() {
     try {
-      // your business logic
+      // ... logic
     } catch (error) {
-      await this.vigileye.logError(error, {
-        userId: data.id,
-        extra: { payload: data },
+      this.vigileye.logError(error, {
+        userId: 'user-123',
+        extra: { someData: 'value' }
       });
-      throw error;
     }
+  }
+
+  logAudit() {
+    this.vigileye.logInfo('Action performed', { category: 'audit' });
   }
 }
 ```
 
 ## Configuration Options
 
-| Option | Type | Required | Description |
-| --- | --- | --- | --- |
-| `apiKey` | `string` | Yes | Your project's Vigil Eye API Key |
-| `serverUrl` | `string` | Yes | The URL of your Vigil Eye server |
-| `enabled` | `boolean` | No | Defaults to `true` if `NODE_ENV=production`, otherwise `false` |
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `apiKey` | `string` | **Required** | Your environment-specific API key |
+| `serverUrl` | `string` | `http://localhost:4000` | URL of your Vigil Eye server |
+| `enabled` | `boolean` | `true` (in prod) | Enable/disable all logging |
+| `ignoreStatusCodes` | `number[]` | `[404]` | HTTP status codes to ignore |
+| `timeout` | `number` | `5000` | Request timeout in ms |
 
-## License
+## Context Interface
 
-MIT
+When logging errors manually, you can provide an `ErrorContext`:
+
+```typescript
+interface ErrorContext {
+  url?: string;
+  method?: string;
+  userId?: string;
+  statusCode?: number;
+  userAgent?: string;
+  body?: any;
+  query?: any;
+  params?: any;
+  extra?: Record<string, any>;
+}
+```

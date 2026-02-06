@@ -1,7 +1,7 @@
 {
-    "name": "@vigileye/nestjs",
-    "version": "0.1.0",
-    "description": "Vigil Eye SDK for NestJS",
+    "name": "@prabalesh/vigileye-nestjs",
+    "version": "0.2.0",
+    "description": "Vigil Eye SDK for NestJS - Error tracking with multi-environment support",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "scripts": {
@@ -9,26 +9,30 @@
         "prepublish": "npm run build"
     },
     "peerDependencies": {
-        "@nestjs/common": "^10.0.0",
-        "@nestjs/core": "^10.0.0",
-        "axios": "^1.6.0"
+        "@nestjs/common": "^10.0.0 || ^11.0.0",
+        "@nestjs/core": "^10.0.0 || ^11.0.0"
     },
     "devDependencies": {
         "@nestjs/common": "^10.0.0",
         "@nestjs/core": "^10.0.0",
         "@types/node": "^20.0.0",
-        "axios": "^1.6.0",
         "typescript": "^5.0.0"
     },
     "keywords": [
-        "nestjs",
+        "vigileye",
         "error-tracking",
         "monitoring",
-        "vigileye"
+        "nestjs",
+        "observability",
+        "multi-environment"
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/vigileye/nestjs-sdk"
+        "url": "https://github.com/prabalesh/vigileye-nestjs"
     },
-    "license": "MIT"
+    "author": "Prabalesh",
+    "license": "MIT",
+    "engines": {
+        "node": ">=18.0.0"
+    }
 }

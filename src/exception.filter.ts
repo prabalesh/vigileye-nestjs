@@ -3,49 +3,63 @@ import {
     Catch,
     ArgumentsHost,
     HttpException,
-    HttpStatus,
+    Inject,
 } from '@nestjs/common';
 import { VigileEyeService } from './vigileye.service';
+import { VigileEyeOptions } from './interfaces/vigileye-options.interface';
 
 @Catch()
 export class VigileEyeExceptionFilter implements ExceptionFilter {
-    constructor(private readonly vigileyeService: VigileEyeService) { }
+    private readonly ignoreStatusCodes: number[];
 
-    async catch(exception: any, host: ArgumentsHost) {
+    constructor(
+        private readonly vigileye: VigileEyeService,
+        @Inject('VIGILEYE_OPTIONS') private readonly options: VigileEyeOptions,
+    ) {
+        // Default: ignore 404 errors
+        this.ignoreStatusCodes = options.ignoreStatusCodes ?? [404];
+    }
+
+    catch(exception: any, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
-        const response = ctx.getResponse();
         const request = ctx.getRequest();
+        const response = ctx.getResponse();
 
         const status =
             exception instanceof HttpException
                 ? exception.getStatus()
-                : HttpStatus.INTERNAL_SERVER_ERROR;
+                : 500;
 
-        const message = exception instanceof Error ? exception.message : 'Internal server error';
+        const message =
+            exception instanceof HttpException
+                ? exception.message
+                : 'Internal server error';
 
-        // Log to Vigil Eye
-        await this.vigileyeService.logError(exception, {
-            url: request.url,
-            method: request.method,
-            statusCode: status,
-            extra: {
-                headers: request.headers,
+        // Check if this status code should be ignored
+        const shouldIgnore = this.ignoreStatusCodes.includes(status);
+
+        // Log to Vigil Eye if:
+        // - Status >= 400 (client or server error)
+        // - Status not in ignore list
+        if (status >= 400 && !shouldIgnore) {
+            this.vigileye.logError(exception, {
+                url: request.url,
+                method: request.method,
+                statusCode: status,
+                userAgent: request.headers['user-agent'],
+                userId: request.user?.id || request.user?.email,
                 body: request.body,
                 query: request.query,
-            },
-        });
-
-        // Maintain NestJS default behavior by re-throwing if it's a standard exception
-        // or manually sending response if we are at the end of the filter chain
-        if (exception instanceof HttpException) {
-            return response.status(status).json(exception.getResponse());
+                params: request.params,
+            });
         }
 
-        return response.status(status).json({
+        // Always return response to client (don't break the app)
+        response.status(status).json({
             statusCode: status,
+            message,
             timestamp: new Date().toISOString(),
             path: request.url,
-            message: message,
         });
     }
 }
