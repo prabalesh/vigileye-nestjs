@@ -38,17 +38,25 @@ export class VigileEyeExceptionFilter implements ExceptionFilter {
         // Check if this status code should be ignored
         const shouldIgnore = this.ignoreStatusCodes.includes(status);
 
+        // Capture and sanitize request data
+        const requestBody = this.sanitizeBody(request.body);
+        const requestHeaders = this.sanitizeHeaders(request.headers);
+
+        // Define the response that will be sent to the client
+        const responseObject = {
+            statusCode: status,
+            message,
+            timestamp: new Date().toISOString(),
+            path: request.url,
+        };
+
+        // Measure response time (if available from middleware)
+        const responseTime = request['responseTime'] || null;
+
         // Log to Vigil Eye if:
         // - Status >= 400 (client or server error)
         // - Status not in ignore list
         if (status >= 400 && !shouldIgnore) {
-            // Capture and sanitize request data
-            const requestBody = this.sanitizeBody(request.body);
-            const requestHeaders = this.sanitizeHeaders(request.headers);
-
-            // Measure response time (if available from middleware)
-            const responseTime = request['responseTime'] || null;
-
             // NO await - fire and forget
             this.vigileye.logError(exception, {
                 url: request.url,
@@ -61,17 +69,13 @@ export class VigileEyeExceptionFilter implements ExceptionFilter {
                 params: request.params,
                 requestBody: JSON.stringify(requestBody),
                 requestHeaders: requestHeaders,
+                responseBody: JSON.stringify(responseObject),
                 responseTimeMs: responseTime,
             });
         }
 
         // Return response immediately (not blocked by Vigil Eye)
-        response.status(status).json({
-            statusCode: status,
-            message,
-            timestamp: new Date().toISOString(),
-            path: request.url,
-        });
+        response.status(status).json(responseObject);
     }
 
     private sanitizeBody(body: any): any {
