@@ -8,7 +8,7 @@ export class ResponseTimeMiddleware implements NestMiddleware {
 
         res.on('finish', () => {
             const duration = Date.now() - start;
-            req['responseTime'] = duration;
+            (req as any).responseTime = duration;
         });
 
         next();

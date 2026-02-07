@@ -14,7 +14,7 @@ Initialize the `VigileEyeModule` in your `app.module.ts`:
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { VigileEyeModule } from '@vigileye/nestjs';
+import { VigileEyeModule } from '@prabalesh/vigileye-nestjs';
 
 @Module({
   imports: [
@@ -47,7 +47,7 @@ Inject the `VigileEyeService` to log custom events or handle errors manually:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { VigileEyeService } from '@vigileye/nestjs';
+import { VigileEyeService } from '@prabalesh/vigileye-nestjs';
 
 @Injectable()
 export class MyService {
