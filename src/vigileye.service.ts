@@ -16,11 +16,14 @@ export class VigileEyeService {
     }
 
     /**
-     * Log an error to Vigil Eye
+     * Log an error to Vigil Eye (non-blocking, fire-and-forget)
+     * This method returns immediately without waiting for Vigil Eye response
      */
-    async logError(error: Error | any, context?: ErrorContext): Promise<void> {
+    logError(error: Error | any, context?: ErrorContext): void {
         if (!this.enabled) {
-            console.error('[Vigil Eye] Error (not sent - disabled):', error.message);
+            if (process.env.NODE_ENV === 'development') {
+                console.error('[Vigil Eye] Error (not sent - disabled):', error.message);
+            }
             return;
         }
 
@@ -29,6 +32,41 @@ export class VigileEyeService {
             return;
         }
 
+        // Fire and forget - don't await
+        this.sendErrorAsync(error, context).catch((err) => {
+            // Silently fail - never crash the app
+            if (process.env.NODE_ENV === 'development') {
+                console.error('[Vigil Eye] Failed to send error:', err.message);
+            }
+        });
+    }
+
+    /**
+     * Log a warning to Vigil Eye (non-blocking)
+     */
+    logWarn(message: string, context?: ErrorContext): void {
+        if (!this.enabled) return;
+
+        this.sendLogAsync('warn', message, context).catch(() => {
+            // Silently fail
+        });
+    }
+
+    /**
+     * Log info message to Vigil Eye (non-blocking)
+     */
+    logInfo(message: string, context?: Record<string, any>): void {
+        if (!this.enabled) return;
+
+        this.sendLogAsync('info', message, context).catch(() => {
+            // Silently fail
+        });
+    }
+
+    /**
+     * Internal method - actually sends the error (async)
+     */
+    private async sendErrorAsync(error: Error | any, context?: ErrorContext): Promise<void> {
         try {
             const payload = {
                 source: 'backend',
@@ -40,6 +78,10 @@ export class VigileEyeService {
                 userAgent: context?.userAgent,
                 userId: context?.userId,
                 statusCode: context?.statusCode,
+                requestBody: context?.requestBody,
+                requestHeaders: context?.requestHeaders,
+                responseBody: context?.responseBody,
+                responseTimeMs: context?.responseTimeMs,
                 extraData: {
                     ...context?.extra,
                     body: context?.body,
@@ -64,63 +106,30 @@ export class VigileEyeService {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                console.error(
-                    `[Vigil Eye] Failed to log error: ${response.status} ${response.statusText}`,
-                );
+                throw new Error(`HTTP ${response.status}`);
             }
         } catch (err) {
-            // Don't crash the application if Vigil Eye is down
-            console.error('[Vigil Eye] Failed to send error:', err instanceof Error ? err.message : err);
+            // Re-throw to be caught by caller's .catch()
+            throw new Error(`Vigil Eye error: ${err instanceof Error ? err.message : 'Unknown'}`);
         }
     }
 
     /**
-     * Log a warning to Vigil Eye
+     * Internal method - send log message
      */
-    async logWarn(message: string, context?: ErrorContext): Promise<void> {
-        if (!this.enabled) return;
-
+    private async sendLogAsync(
+        level: string,
+        message: string,
+        context?: ErrorContext | Record<string, any>,
+    ): Promise<void> {
         try {
             const payload = {
                 source: 'backend',
-                level: 'warn',
+                level,
                 message,
-                url: context?.url,
-                method: context?.method,
-                userId: context?.userId,
-                extraData: context?.extra,
-            };
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-            await fetch(`${this.serverUrl}/api/log`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.apiKey,
-                },
-                body: JSON.stringify(payload),
-                signal: controller.signal,
-            });
-
-            clearTimeout(timeoutId);
-        } catch (err) {
-            console.error('[Vigil Eye] Failed to send warning:', err instanceof Error ? err.message : err);
-        }
-    }
-
-    /**
-     * Log info message to Vigil Eye
-     */
-    async logInfo(message: string, context?: Record<string, any>): Promise<void> {
-        if (!this.enabled) return;
-
-        try {
-            const payload = {
-                source: 'backend',
-                level: 'info',
-                message,
+                url: (context as ErrorContext)?.url,
+                method: (context as ErrorContext)?.method,
+                userId: (context as ErrorContext)?.userId,
                 extraData: context,
             };
 
@@ -139,7 +148,7 @@ export class VigileEyeService {
 
             clearTimeout(timeoutId);
         } catch (err) {
-            // Silently fail for info logs
+            // Silently ignore
         }
     }
 }

@@ -42,24 +42,74 @@ export class VigileEyeExceptionFilter implements ExceptionFilter {
         // - Status >= 400 (client or server error)
         // - Status not in ignore list
         if (status >= 400 && !shouldIgnore) {
+            // Capture and sanitize request data
+            const requestBody = this.sanitizeBody(request.body);
+            const requestHeaders = this.sanitizeHeaders(request.headers);
+
+            // Measure response time (if available from middleware)
+            const responseTime = request['responseTime'] || null;
+
+            // NO await - fire and forget
             this.vigileye.logError(exception, {
                 url: request.url,
                 method: request.method,
                 statusCode: status,
                 userAgent: request.headers['user-agent'],
                 userId: request.user?.id || request.user?.email,
-                body: request.body,
+                body: requestBody,
                 query: request.query,
                 params: request.params,
+                requestBody: JSON.stringify(requestBody),
+                requestHeaders: requestHeaders,
+                responseTimeMs: responseTime,
             });
         }
 
-        // Always return response to client (don't break the app)
+        // Return response immediately (not blocked by Vigil Eye)
         response.status(status).json({
             statusCode: status,
             message,
             timestamp: new Date().toISOString(),
             path: request.url,
         });
+    }
+
+    private sanitizeBody(body: any): any {
+        if (!body) return null;
+
+        // Remove sensitive fields from request body
+        const sanitized = { ...body };
+        const sensitiveFields = ['password', 'token', 'secret', 'apiKey', 'api_key'];
+
+        for (const field of sensitiveFields) {
+            if (sanitized[field]) {
+                sanitized[field] = '[REDACTED]';
+            }
+        }
+
+        return sanitized;
+    }
+
+    private sanitizeHeaders(headers: any): Record<string, string> {
+        const sanitized: Record<string, string> = {};
+
+        const sensitiveHeaders = [
+            'authorization',
+            'cookie',
+            'x-api-key',
+            'api-key',
+        ];
+
+        for (const [key, value] of Object.entries(headers)) {
+            const lowerKey = key.toLowerCase();
+
+            if (sensitiveHeaders.some(sh => lowerKey.includes(sh))) {
+                sanitized[key] = '[REDACTED]';
+            } else {
+                sanitized[key] = String(value);
+            }
+        }
+
+        return sanitized;
     }
 }

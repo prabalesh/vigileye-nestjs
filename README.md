@@ -94,6 +94,77 @@ interface ErrorContext {
   body?: any;
   query?: any;
   params?: any;
+  requestBody?: string;
+  requestHeaders?: Record<string, string>;
+  responseTimeMs?: number;
   extra?: Record<string, any>;
 }
+```
+
+## Data Captured
+
+Vigil Eye automatically captures the following data when an error occurs:
+
+### Error Details
+- Error message and stack trace
+- Error level (error, warn, info)
+- Timestamp
+
+### Request Context
+- HTTP method (GET, POST, etc.)
+- Request URL
+- Request body (sensitive fields redacted)
+- Request headers (authorization, cookies redacted)
+- Query parameters
+- Route parameters
+- User agent
+
+### Response Context
+- Status code
+- Response time in milliseconds
+
+### Sensitive Data Handling
+The SDK automatically redacts sensitive information:
+- ✅ Passwords → [REDACTED]
+- ✅ Authorization headers → [REDACTED]
+- ✅ Cookies → [REDACTED]
+- ✅ API keys → [REDACTED]
+- ✅ Tokens → [REDACTED]
+
+Request and response bodies are limited to prevent large data transmission.
+
+## Performance & Non-Blocking
+
+**This SDK is completely non-blocking (fire-and-forget).** 
+
+### What This Means
+
+✅ **Your API responds immediately** - No waiting for Vigil Eye server
+✅ **Never slows down your app** - Logging happens in background
+✅ **Graceful failures** - If Vigil Eye is down, your app still works
+✅ **No impact on latency** - Error tracking adds 0ms to response time
+
+### How It Works
+
+```typescript
+// User makes request
+GET /api/users → Your NestJS app
+
+// Error occurs
+throw new Error('Database connection failed');
+
+// Exception filter catches error
+↓
+// Vigil Eye logs error (fire-and-forget, no await)
+this.vigileye.logError(error, context);  // Returns immediately
+↓
+// Response sent to user instantly
+← 500 Internal Server Error (0ms delay from Vigil Eye)
+
+// In background (async):
+↓
+Vigil Eye SDK sends error to server
+↓
+If successful: Error logged ✅
+If failed: Silently ignored (your app unaffected) ✅
 ```

@@ -43,5 +43,9 @@ export interface ErrorContext {
     body?: any;
     query?: any;
     params?: any;
+    requestBody?: string;
+    requestHeaders?: Record<string, string>;
+    responseBody?: string;
+    responseTimeMs?: number;
     extra?: Record<string, any>;
 }
